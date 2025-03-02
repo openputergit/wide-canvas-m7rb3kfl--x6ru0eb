@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Recognition System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .video-container {
+            position: relative;
+            width: 100%;
+            max-width: 640px;
+            margin: 0 auto;
+        }
+        #videoElement {
+            width: 100%;
+            height: auto;
+            background-color: #666;
+        }
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">Face Recognition System</h1>
+            <p class="text-gray-600">Real-time face detection and recognition system</p>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-8">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">Camera Feed</h2>
+                <div class="video-container">
+                    <video id="videoElement" autoplay playsinline></video>
+                    <canvas id="overlay" class="overlay"></canvas>
+                </div>
+                <div class="mt-4 flex justify-center gap-4">
+                    <button id="startButton" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition">
+                        <i class="bi bi-camera-video-fill mr-2"></i>Start Camera
+                    </button>
+                    <button id="stopButton" class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition">
+                        <i class="bi bi-stop-circle-fill mr-2"></i>Stop Camera
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">Known Faces Database</h2>
+                <div class="mb-4">
+                    <label class="block text-gray-700 mb-2">Add New Face</label>
+                    <div class="flex gap-2">
+                        <input type="file" id="faceInput" accept="image/*" class="block w-full text-sm text-gray-500
+                            file:mr-4 file:py-2 file:px-4
+                            file:rounded-md file:border-0
+                            file:text-sm file:font-semibold
+                            file:bg-blue-50 file:text-blue-700
+                            hover:file:bg-blue-100
+                        "/>
+                        <input type="text" id="nameInput" placeholder="Person's name" class="border rounded-md px-3 py-2"/>
+                        <button id="addFaceButton" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition">
+                            <i class="bi bi-plus-lg mr-2"></i>Add
+                        </button>
+                    </div>
+                </div>
+
+                <div id="knownFaces" class="grid grid-cols-2 gap-4">
+                    <!-- Known faces will be dynamically added here -->
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-8 bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-semibold mb-4">Recognition Log</h2>
+            <div id="recognitionLog" class="h-48 overflow-y-auto">
+                <!-- Recognition logs will be added here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const video = document.getElementById('videoElement');
+            const startButton = document.getElementById('startButton');
+            const stopButton = document.getElementById('stopButton');
+            const canvas = document.getElementById('overlay');
+            const ctx = canvas.getContext('2d');
+            const recognitionLog = document.getElementById('recognitionLog');
+            const knownFaces = document.getElementById('knownFaces');
+            const addFaceButton = document.getElementById('addFaceButton');
+            
+            let stream = null;
+
+            // Start camera
+            startButton.addEventListener('click', async () => {
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    video.srcObject = stream;
+                    // Set canvas size to match video
+                    canvas.width = video.clientWidth;
+                    canvas.height = video.clientHeight;
+                } catch (err) {
+                    console.error('Error accessing camera:', err);
+                    alert('Could not access camera. Please ensure you have granted camera permissions.');
+                }
+            });
+
+            // Stop camera
+            stopButton.addEventListener('click', () => {
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                    video.srcObject = null;
+                }
+            });
+
+            // Add new face
+            addFaceButton.addEventListener('click', () => {
+                const fileInput = document.getElementById('faceInput');
+                const nameInput = document.getElementById('nameInput');
+                
+                if (fileInput.files.length > 0 && nameInput.value) {
+                    const file = fileInput.files[0];
+                    const name = nameInput.value;
+                    
+                    // Create new face entry
+                    const faceElement = document.createElement('div');
+                    faceElement.className = 'bg-gray-50 p-4 rounded-lg';
+                    faceElement.innerHTML = `
+                        <img src="${URL.createObjectURL(file)}" alt="${name}" class="w-full h-32 object-cover rounded-md mb-2">
+                        <p class="text-center font-medium">${name}</p>
+                    `;
+                    
+                    knownFaces.appendChild(faceElement);
+                    
+                    // Clear inputs
+                    fileInput.value = '';
+                    nameInput.value = '';
+                    
+                    // Add to recognition log
+                    addToLog(`Added new face: ${name}`);
+                }
+            });
+
+            // Simulate face recognition (for demo purposes)
+            setInterval(() => {
+                if (stream) {
+                    const names = ['John', 'Emma', 'Michael', 'Sarah'];
+                    const randomName = names[Math.floor(Math.random() * names.length)];
+                    const confidence = (Math.random() * 20 + 80).toFixed(2);
+                    
+                    // Draw detection box
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.strokeStyle = '#00ff00';
+                    ctx.lineWidth = 2;
+                    const x = Math.random() * (canvas.width - 100);
+                    const y = Math.random() * (canvas.height - 100);
+                    ctx.strokeRect(x, y, 100, 100);
+                    
+                    // Draw name label
+                    ctx.fillStyle = '#00ff00';
+                    ctx.fillRect(x, y + 100, 100, 20);
+                    ctx.fillStyle = '#000000';
+                    ctx.font = '12px Inter';
+                    ctx.fillText(randomName, x + 5, y + 115);
+                    
+                    addToLog(`Detected ${randomName} (${confidence}% confidence)`);
+                }
+            }, 3000);
+
+            function addToLog(message) {
+                const logEntry = document.createElement('div');
+                logEntry.className = 'text-sm text-gray-600 py-1';
+                logEntry.innerHTML = `
+                    <i class="bi bi-person-check mr-2"></i>
+                    ${message} - ${new Date().toLocaleTimeString()}
+                `;
+                recognitionLog.insertBefore(logEntry, recognitionLog.firstChild);
+            }
+        });
+    </script>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
